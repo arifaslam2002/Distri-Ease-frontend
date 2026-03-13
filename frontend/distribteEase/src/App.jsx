@@ -492,12 +492,11 @@ const Dashboard = ()=>{
 // ── SEARCHABLE SELECT COMPONENT ───────────────────────────────────────────
 // Drop this into your App.jsx replacing the Orders component
 
-const SearchSelect = ({ label, options, value, onChange, placeholder = "Search…" }) => {
-  const [query, setQuery]   = useState("");
-  const [open, setOpen]     = useState(false);
-  const ref                 = useRef(null);
+const SearchSelect = ({ label, options, value, onChange, placeholder = "Search…", onAddNew, addNewLabel }) => {
+  const [query, setQuery] = useState("");
+  const [open, setOpen]   = useState(false);
+  const ref               = useRef(null);
 
-  // Close on outside click
   useEffect(() => {
     const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
     document.addEventListener("mousedown", handler);
@@ -508,7 +507,8 @@ const SearchSelect = ({ label, options, value, onChange, placeholder = "Search�
     o.label.toLowerCase().includes(query.toLowerCase())
   );
 
-  const selected = options.find(o => String(o.value) === String(value));
+  // ✅ no default selected — only show if explicitly chosen
+  const selected = value ? options.find(o => String(o.value) === String(value)) : null;
 
   return (
     <div ref={ref} style={{ marginBottom: 14, position: "relative" }}>
@@ -579,9 +579,39 @@ const SearchSelect = ({ label, options, value, onChange, placeholder = "Search�
                 )}
                 <span>{o.label}</span>
               </div>
-            )) : (
-              <div style={{ padding: "14px 12px", fontSize: 11, color: "var(--muted)", textAlign: "center" }}>
-                No results for "{query}"
+            )) : null}
+
+            {/* ✅ Add new button when no results found */}
+            {filtered.length === 0 && onAddNew && (
+              <div
+                onClick={() => { setOpen(false); setQuery(""); onAddNew(query); }}
+                style={{
+                  padding: "12px", fontSize: 12, cursor: "pointer", textAlign: "center",
+                  color: "var(--accent)", borderTop: filtered.length > 0 ? "1px solid var(--border)" : "none",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = "rgba(0,229,160,.06)"}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+              >
+                <span style={{ fontSize: 14 }}>+</span>
+                <span>{addNewLabel || `Add "${query}"`}</span>
+              </div>
+            )}
+
+            {/* ✅ Add new button always visible at bottom when results exist too */}
+            {filtered.length > 0 && onAddNew && (
+              <div
+                onClick={() => { setOpen(false); setQuery(""); onAddNew(query); }}
+                style={{
+                  padding: "10px 12px", fontSize: 11, cursor: "pointer",
+                  color: "var(--accent)", borderTop: "1px solid var(--border)",
+                  display: "flex", alignItems: "center", gap: 6,
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = "rgba(0,229,160,.06)"}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+              >
+                <span style={{ fontSize: 13 }}>+</span>
+                <span>{addNewLabel || "Add new"}</span>
               </div>
             )}
           </div>
@@ -593,7 +623,7 @@ const SearchSelect = ({ label, options, value, onChange, placeholder = "Search�
 
 
 // ── PRODUCT ROWS WITH SEARCH ───────────────────────────────────────────────
-const ProductRows = ({ rows, setRows, products }) => (
+const ProductRows = ({ rows, setRows, products, onAddProduct }) => (
   <div>
     <div style={{ fontSize: 9, color: "var(--muted)", textTransform: "uppercase", letterSpacing: 1.8, marginBottom: 7 }}>
       Products
@@ -607,6 +637,8 @@ const ProductRows = ({ rows, setRows, products }) => (
               options={products.map(p => ({ value: p.id, label: `${p.name} — ₹${p.price}` }))}
               value={r.product_id}
               onChange={val => { const n = [...rows]; n[i].product_id = val; setRows(n); }}
+              onAddNew={onAddProduct}
+              addNewLabel="Add new product"
             />
           </div>
           <div style={{ marginBottom: 14 }}>
@@ -633,12 +665,12 @@ const ProductRows = ({ rows, setRows, products }) => (
         </div>
       ))}
     </div>
-    <Btn full onClick={() => setRows([...rows, { product_id: products[0]?.id || "", quantity: 1 }])}>
+    {/* ✅ start with empty row, no default product */}
+    <Btn full onClick={() => setRows([...rows, { product_id: "", quantity: 1 }])}>
       + Add Product
     </Btn>
   </div>
 );
-
 
 // ── ORDERS PAGE ────────────────────────────────────────────────────────────
 const Orders = ({ toast }) => {
@@ -662,7 +694,6 @@ const Orders = ({ toast }) => {
       const raw = r.data;
       const d = Array.isArray(raw) ? raw : raw?.shops || raw?.data || [];
       sSh(d);
-      if (d[0]) sSi(String(d[0].id));
     }).catch(() => sSh([]));
     api.get("/products/products").then(r => {
       const d = r.data || [];
@@ -736,7 +767,7 @@ const Orders = ({ toast }) => {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>
-        <Btn primary onClick={() => { sErr(""); sM(true); }}>+ Place Order</Btn>
+       <Btn primary onClick={() => { sErr(""); sR([{ product_id: "", quantity: 1 }]); sM(true); }}>+ Place Order</Btn>
       </div>
 
       <Card>
@@ -833,11 +864,16 @@ const Orders = ({ toast }) => {
       >
         <ErrMsg msg={err} />
         <SearchSelect
-          label="Shop" placeholder="Search shop…"
-          options={(Array.isArray(shops) ? shops : []).map(s => ({ value: s.id, label: s.shop_name }))}
-          value={shopId} onChange={val => sSi(String(val))}
-        />
-        <ProductRows rows={rows} setRows={sR} products={prods} />
+  label="Shop" placeholder="Search shop…"
+  options={(Array.isArray(shops) ? shops : []).map(s => ({ value: s.id, label: s.shop_name }))}
+  value={shopId} onChange={val => sSi(String(val))}
+  onAddNew={() => { sM(false); /* navigate to shops or open add shop modal */ toast("🏪", "Go to Shops page to add a new shop") }}
+  addNewLabel="Add new shop"
+/>
+        <ProductRows
+  rows={rows} setRows={sR} products={prods}
+  onAddProduct={() => { sM(false); toast("📦", "Go to Products page to add a new product") }}
+/>
         <div style={{ marginTop: 14, background: "rgba(108,99,255,.06)", border: "1px solid rgba(108,99,255,.2)", borderRadius: 7, padding: "10px 12px", fontSize: 11, color: "var(--muted)" }}>
           📨 Telegram notification sent automatically
         </div>
@@ -883,7 +919,28 @@ const Shops = ({toast})=>{
   const [prods,sPr]           = useState([]);
   const [editSaving,sES]      = useState(false);
   const [editErr,sEE]         = useState("");
+  // ── quick place order states ──
+const [orderModal,sOM]  = useState(false);
+const [orderShop,sOS]   = useState(null);
+const [orderRows,sOR]   = useState([{product_id:"",quantity:1}]);
+const [orderSaving,sOSv]= useState(false);
+const [orderErr,sOE]    = useState("");
 
+const openPlaceOrder=(shop)=>{
+  sOS(shop); sOR([{product_id:"",quantity:1}]); sOE(""); sOM(true);
+};
+
+const placeOrder=async()=>{
+  if(!orderRows[0]?.product_id){ sOE("Select at least one product"); return; }
+  sOE(""); sOSv(true);
+  try{
+    await api.post(`/orders/${orderShop.id}/order`,{
+      items: orderRows.map(r=>({product_id:parseInt(r.product_id), quantity:parseInt(r.quantity)}))
+    });
+    toast("🛒","Order placed!"); sOM(false);
+  } catch(e){ sOE(e.response?.data?.detail||"Failed to place order"); }
+  finally{ sOSv(false); }
+};
   const load_=useCallback(()=>{
     sL(true);
     api.get("/shops/shops")
@@ -973,47 +1030,52 @@ const Shops = ({toast})=>{
       </div>
 
       <Card>
-        {load?<Spin/>:(
-          <div className="tbl-wrap">
-            <table className="tbl" style={{minWidth:200}}>
-              <colgroup>
-                <col/><col style={{width:"110px"}} className="hide-sm"/><col style={{width:"140px"}} className="hide-sm"/><col style={{width:"75px"}}/><col style={{width:"110px"}}/>
-              </colgroup>
-              <thead><tr>
-                <th className="th">Shop Name</th>
-                <th className="th hide-sm">Phone</th>
-                <th className="th hide-sm">Address</th>
-                <th className="th">Status</th>
-                <th className="th">Actions</th>
-              </tr></thead>
-              <tbody>
-                {shops.length>0?shops.map(s=>(
-                  <tr key={s.id} className="tr">
-                    <td className="td">
-                      <span className="shop-name-link" onClick={()=>openShop(s)} style={{fontWeight:500}}>
-                        {s.shop_name}
-                      </span>
-                      <div className="show-sm" style={{fontSize:10,color:"var(--muted)",marginTop:3,display:"flex",flexDirection:"column",gap:2}}>
-                        {s.phone&&<span>📞 {s.phone}</span>}
-                        {s.address&&<span>📍 {s.address}</span>}
-                      </div>
-                    </td>
-                    <td className="td hide-sm" style={{color:"var(--muted)"}}>{s.phone||"—"}</td>
-                    <td className="td hide-sm" style={{color:"var(--muted)"}}>{s.address||"—"}</td>
-                    <td className="td"><Badge label={s.is_active?"active":"inactive"} cfg={s.is_active?SC.active:SC.inactive}/></td>
-                    <td className="td">
-                      <div style={{display:"flex",gap:6}}>
-                        <Btn small onClick={()=>openEdit(s)}>✏️</Btn>
-                        <Btn small danger onClick={()=>del(s.id)}>🗑️</Btn>
-                      </div>
-                    </td>
-                  </tr>
-                )):<tr><td colSpan={5} style={{padding:"32px 0",textAlign:"center",color:"var(--muted)",fontSize:12}}>No shops found</td></tr>}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
+  {load?<Spin/>:(
+    <div className="tbl-wrap">
+      <table className="tbl" style={{width:"100%",tableLayout:"fixed"}}>
+        <colgroup>
+          <col style={{width:"30%"}}/> 
+          <col style={{width:"18%"}} className="hide-sm"/>
+          <col style={{width:"22%"}} className="hide-sm"/>
+          <col style={{width:"12%"}}/>
+          <col style={{width:"18%"}}/>
+        </colgroup>
+        <thead><tr>
+          <th className="th">Shop Name</th>
+          <th className="th hide-sm">Phone</th>
+          <th className="th hide-sm">Address</th>
+          <th className="th">Status</th>
+          <th className="th">Actions</th>
+        </tr></thead>
+        <tbody>
+          {shops.length>0?shops.map(s=>(
+            <tr key={s.id} className="tr">
+              <td className="td">
+                <span className="shop-name-link" onClick={()=>openShop(s)} style={{fontWeight:500}}>
+                  {s.shop_name}
+                </span>
+                <div className="show-sm" style={{fontSize:10,color:"var(--muted)",marginTop:3,display:"flex",flexDirection:"column",gap:2}}>
+                  {s.phone&&<span>📞 {s.phone}</span>}
+                  {s.address&&<span>📍 {s.address}</span>}
+                </div>
+              </td>
+              <td className="td hide-sm" style={{color:"var(--muted)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.phone||"—"}</td>
+              <td className="td hide-sm" style={{color:"var(--muted)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.address||"—"}</td>
+              <td className="td"><Badge label={s.is_active?"act":"inact"} cfg={s.is_active?SC.active:SC.inactive}/></td>
+              <td className="td">
+                <div style={{display:"flex",gap:4,flexWrap:"nowrap"}}>
+                  <Btn small onClick={()=>openPlaceOrder(s)} style={{color:"var(--accent)",borderColor:"var(--accent)"}}>🛒</Btn>
+                  <Btn small onClick={()=>openEdit(s)}>✏️</Btn>
+                  <Btn small danger onClick={()=>del(s.id)}>🗑️</Btn>
+                </div>
+              </td>
+            </tr>
+          )):<tr><td colSpan={5} style={{padding:"32px 0",textAlign:"center",color:"var(--muted)",fontSize:12}}>No shops found</td></tr>}
+        </tbody>
+      </table>
+    </div>
+  )}
+</Card>
 
       {/* ── Shop Detail + Orders Modal ── */}
       <Modal open={shopModal} onClose={()=>sSM(false)}
@@ -1121,6 +1183,26 @@ const Shops = ({toast})=>{
           <span>Phone: <span style={{color:"var(--text)"}}>{editShop?.phone||"—"}</span></span>
         </div>
       </Modal>
+      {/* ── Quick Place Order Modal ── */}
+<Modal open={orderModal} onClose={()=>sOM(false)}
+  title={`Place Order — ${orderShop?.shop_name||""}`}
+  footer={
+    <><Btn onClick={()=>sOM(false)}>Cancel</Btn>
+    <Btn primary onClick={placeOrder} disabled={orderSaving}>
+      {orderSaving?"Placing…":"Place Order"}
+    </Btn></>
+  }
+>
+  <ErrMsg msg={orderErr}/>
+  <div style={{marginBottom:14,padding:"10px 12px",background:"var(--s2)",borderRadius:7,fontSize:11,color:"var(--muted)",display:"flex",gap:16,flexWrap:"wrap"}}>
+    <span>Shop: <span style={{color:"var(--text)",fontWeight:500}}>{orderShop?.shop_name}</span></span>
+    {orderShop?.phone&&<span>📞 <span style={{color:"var(--text)"}}>{orderShop.phone}</span></span>}
+  </div>
+  <ProductRows rows={orderRows} setRows={sOR} products={prods}/>
+  <div style={{marginTop:10,fontSize:10,color:"var(--muted)"}}>
+    📨 Telegram notification sent automatically
+  </div>
+</Modal>
     </div>
   );
 };
