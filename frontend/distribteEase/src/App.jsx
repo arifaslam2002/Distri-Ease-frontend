@@ -320,7 +320,42 @@ const Toast = ({toasts})=>(
     ))}
   </div>
 );
-
+const ConfirmModal = ({open, onConfirm, onCancel, title="Are you sure?", message, confirmLabel="Yes, Sign Out", danger=true})=>{
+  if(!open) return null;
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+      {/* backdrop */}
+      <div onClick={onCancel} style={{position:"absolute",inset:0,background:"rgba(0,0,0,.6)",backdropFilter:"blur(4px)"}}/>
+      {/* box */}
+      <div style={{position:"relative",width:"100%",maxWidth:360,background:"var(--s1)",border:"1px solid var(--border)",borderRadius:12,padding:24,boxShadow:"0 24px 64px rgba(0,0,0,.6)"}}>
+        {/* icon */}
+        <div style={{width:44,height:44,borderRadius:"50%",background:danger?"rgba(255,80,80,.1)":"rgba(0,229,160,.1)",border:`1px solid ${danger?"rgba(255,80,80,.3)":"rgba(0,229,160,.3)"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,marginBottom:16}}>
+          {danger?"⚠️":"❓"}
+        </div>
+        {/* title */}
+        <div style={{fontSize:15,fontWeight:700,marginBottom:6,color:"var(--text)"}}>{title}</div>
+        {/* message */}
+        {message&&<div style={{fontSize:12,color:"var(--muted)",marginBottom:20,lineHeight:1.6}}>{message}</div>}
+        {/* buttons */}
+        <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+          <Btn onClick={onCancel}>Cancel</Btn>
+          <button
+            onClick={onConfirm}
+            style={{
+              padding:"8px 16px",borderRadius:7,border:"none",cursor:"pointer",
+              fontSize:12,fontWeight:600,fontFamily:"var(--font)",
+              background:danger?"#ff5050":"var(--accent)",
+              color:danger?"#fff":"#000",
+              transition:"opacity .15s",
+            }}
+            onMouseEnter={e=>e.currentTarget.style.opacity=".85"}
+            onMouseLeave={e=>e.currentTarget.style.opacity="1"}
+          >{confirmLabel}</button>
+        </div>
+      </div>
+    </div>
+  );
+};
 // ── LOGIN ──────────────────────────────────────────────────────────────────
 const Login = ({onLogin})=>{
   const [email,sE]=useState(""); const [pass,sP]=useState("");
@@ -432,7 +467,6 @@ const Dashboard = ()=>{
                 <tbody>
                   {orders.slice(0,6).map(o=>(
                     <tr key={o.id} className="tr">
-                      <td className="td">#{String(o.id).padStart(3,"0")}</td>
                       <td className="td">{o.shop_name||`Shop #${o.shop_id}`}</td>
                       <td className="td" style={{color:"var(--accent)"}}>₹{o.Grand_total}</td>
                       <td className="td" style={{color:"var(--muted)"}}>{o.order_date?.split("T")[0]||"—"}</td>
@@ -1622,18 +1656,22 @@ const Users = ({toast})=>{
   );
 };
 
-// ── APP ROOT ───────────────────────────────────────────────────────────────
 export default function App(){
   const [auth,sA]  = useState(!!localStorage.getItem("de_token"));
   const [page,sP]  = useState("dashboard");
   const [side,sSd] = useState(false);
   const [toasts,sT]= useState([]);
+  const [signOutConfirm,sSOC] = useState(false);  // ← add this
 
   const toast=(icon,msg)=>{
     const id=Date.now(); sT(t=>[...t,{id,icon,msg}]);
     setTimeout(()=>sT(t=>t.filter(x=>x.id!==id)),3200);
   };
-  const logout=()=>{ localStorage.removeItem("de_token"); localStorage.removeItem("de_user"); sA(false); };
+  const logout=()=>{
+    localStorage.removeItem("de_token");
+    localStorage.removeItem("de_user");
+    sA(false);
+  };
   const user=JSON.parse(localStorage.getItem("de_user")||"{}");
   const goTo=(id)=>{ sP(id); sSd(false); };
 
@@ -1651,6 +1689,17 @@ export default function App(){
   return (
     <>
       <style>{CSS}</style>
+
+      {/* ── Confirm Sign Out Modal ── */}
+      <ConfirmModal
+        open={signOutConfirm}
+        onCancel={()=>sSOC(false)}
+        onConfirm={()=>{ sSOC(false); logout(); }}
+        title="Sign Out?"
+        message="You will be logged out of distributeEase. Any unsaved changes will be lost."
+        confirmLabel="Yes, Sign Out"
+        danger={true}
+      />
 
       {/* Mobile overlay */}
       <div className={`overlay ${side?"show":""}`} onClick={()=>sSd(false)}/>
@@ -1687,7 +1736,8 @@ export default function App(){
                 <div style={{fontSize:9,color:"var(--accent)",textTransform:"uppercase",letterSpacing:1.2,marginTop:1}}>{user.role?.replace("_"," ")||"—"}</div>
               </div>
             </div>
-            <Btn full onClick={logout} style={{fontSize:11}}>Sign Out</Btn>
+            {/* ← changed to open confirm modal */}
+            <Btn full onClick={()=>sSOC(true)} style={{fontSize:11}}>Sign Out</Btn>
           </div>
         </aside>
 
