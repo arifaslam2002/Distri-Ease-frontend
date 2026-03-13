@@ -638,7 +638,7 @@ const ProductRows = ({ rows, setRows, products, onAddProduct }) => (
               value={r.product_id}
               onChange={val=>{ const n=[...rows]; n[i].product_id=val; setRows(n); }}
               onAddNew={()=>onAddProduct&&onAddProduct(i)}  // ← pass row index
-              addNewLabel="+ Add new product"
+              addNewLabel=" Add new product"
             />
           </div>
           <div style={{marginBottom:14}}>
