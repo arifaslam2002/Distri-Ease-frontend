@@ -625,50 +625,41 @@ const SearchSelect = ({ label, options, value, onChange, placeholder = "Search�
 // ── PRODUCT ROWS WITH SEARCH ───────────────────────────────────────────────
 const ProductRows = ({ rows, setRows, products, onAddProduct }) => (
   <div>
-    <div style={{ fontSize: 9, color: "var(--muted)", textTransform: "uppercase", letterSpacing: 1.8, marginBottom: 7 }}>
+    <div style={{fontSize:9,color:"var(--muted)",textTransform:"uppercase",letterSpacing:1.8,marginBottom:7}}>
       Products
     </div>
-    <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 10 }}>
-      {rows.map((r, i) => (
-        <div key={i} style={{ display: "flex", gap: 7, alignItems: "flex-end" }}>
-          <div style={{ flex: 2, minWidth: 0 }}>
+    <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:10}}>
+      {rows.map((r,i) => (
+        <div key={i} style={{display:"flex",gap:7,alignItems:"flex-end"}}>
+          <div style={{flex:2,minWidth:0}}>
             <SearchSelect
               placeholder="Search product…"
-              options={products.map(p => ({ value: p.id, label: `${p.name} — ₹${p.price}` }))}
+              options={products.map(p=>({value:p.id,label:`${p.name} — ₹${p.price}`}))}
               value={r.product_id}
-              onChange={val => { const n = [...rows]; n[i].product_id = val; setRows(n); }}
-              onAddNew={onAddProduct}
-              addNewLabel="Add new product"
+              onChange={val=>{ const n=[...rows]; n[i].product_id=val; setRows(n); }}
+              onAddNew={()=>onAddProduct&&onAddProduct(i)}  // ← pass row index
+              addNewLabel="+ Add new product"
             />
           </div>
-          <div style={{ marginBottom: 14 }}>
+          <div style={{marginBottom:14}}>
             <input
               type="number" min={0} value={r.quantity}
-              onChange={e => { const n = [...rows]; n[i].quantity = e.target.value; setRows(n); }}
-              style={{
-                width: 70, background: "var(--s2)", border: "1px solid var(--border)",
-                borderRadius: 7, padding: "9px 8px", fontFamily: "var(--font)", fontSize: 11,
-                color: "var(--text)", outline: "none", flexShrink: 0,
-              }}
-              onFocus={e => e.target.style.borderColor = "#00e5a0"}
-              onBlur={e => e.target.style.borderColor = "var(--border)"}
+              onChange={e=>{ const n=[...rows]; n[i].quantity=e.target.value; setRows(n); }}
+              style={{width:70,background:"var(--s2)",border:"1px solid var(--border)",borderRadius:7,padding:"9px 8px",fontFamily:"var(--font)",fontSize:11,color:"var(--text)",outline:"none",flexShrink:0}}
+              onFocus={e=>e.target.style.borderColor="#00e5a0"}
+              onBlur={e=>e.target.style.borderColor="var(--border)"}
             />
           </div>
-          {rows.length > 1 && (
-            <div style={{ marginBottom: 14 }}>
-              <span
-                onClick={() => setRows(rows.filter((_, j) => j !== i))}
-                style={{ cursor: "pointer", color: "var(--a3)", fontSize: 16, padding: "9px 4px", display: "block" }}
-              >✕</span>
+          {rows.length>1&&(
+            <div style={{marginBottom:14}}>
+              <span onClick={()=>setRows(rows.filter((_,j)=>j!==i))}
+                style={{cursor:"pointer",color:"var(--a3)",fontSize:16,padding:"9px 4px",display:"block"}}>✕</span>
             </div>
           )}
         </div>
       ))}
     </div>
-    {/* ✅ start with empty row, no default product */}
-    <Btn full onClick={() => setRows([...rows, { product_id: "", quantity: 1 }])}>
-      + Add Product
-    </Btn>
+    <Btn full onClick={()=>setRows([...rows,{product_id:"",quantity:1}])}>+ Add Product</Btn>
   </div>
 );
 
@@ -682,10 +673,68 @@ const Orders = ({ toast }) => {
   const [shops, sSh]     = useState([]);    const [prods, sPr]    = useState([]);
   const [shopId, sSi]    = useState("");    const [rows, sR]      = useState([{ product_id: "", quantity: 1 }]);
   const [editRows, sER]  = useState([]);    const [err, sErr]     = useState("");
+// add these states
+const [addShopModal, sASM] = useState(false);
+const [addShopForm, sASF]  = useState({shop_name:"",phone:"",address:""});
+const [addShopSaving, sASv]= useState(false);
+const [addShopErr, sASE]   = useState("");
 
+const [addProdModal, sAPM] = useState(false);
+const [addProdForm, sAPF]  = useState({name:"",price:"",mrp:""});
+const [addProdSaving, sAPv]= useState(false);
+const [addProdErr, sAPE]   = useState("");
+
+// add shop and auto-select
+const addShopAndSelect = async () => {
+  sASE(""); sASv(true);
+  try {
+    const r = await api.post("/shops/shop", addShopForm);
+    // reload shops
+    const res = await api.get("/shops/shops");
+    const raw = res.data;
+    const d = Array.isArray(raw) ? raw : raw?.shops || raw?.data || [];
+    sSh(d);
+    // auto-select the new shop
+    sSi(String(r.data.id));
+    toast("🏪","Shop added!");
+    sASM(false);
+    sASF({shop_name:"",phone:"",address:""});
+  } catch(e){ sASE(e.response?.data?.detail||"Failed"); }
+  finally{ sASv(false); }
+};
+
+// add product and auto-select in current row
+const [addProdRowIndex, sAPRI] = useState(0);
+const addProdAndSelect = async () => {
+  sAPE(""); sAPv(true);
+  try {
+    const r = await api.post("/products/product", {
+      name: addProdForm.name,
+      price: parseFloat(addProdForm.price),
+      mrp: parseFloat(addProdForm.mrp),
+    });
+    // reload products
+    const res = await api.get("/products/products");
+    const d = res.data || [];
+    sPr(d);
+    // auto-select in the row that triggered it
+    const n = [...rows];
+    n[addProdRowIndex].product_id = String(r.data.id);
+    sR(n);
+    toast("📦","Product added!");
+    sAPM(false);
+    sAPF({name:"",price:"",mrp:"",qty:""});
+  } catch(e){ sAPE(e.response?.data?.detail||"Failed"); }
+  finally{ sAPv(false); }
+};
   const load_ = useCallback(() => {
     sL(true);
-    api.get("/orders/orders").then(r => sO(r.data || [])).catch(() => sO([])).finally(() => sL(false));
+    api.get("/orders/orders").then(r => {
+  const d = r.data || [];
+  // ✅ sort newest first
+  d.sort((a, b) => new Date(b.order_date) - new Date(a.order_date));
+  sO(d);
+}).catch(() => sO([])).finally(() => sL(false));;
   }, []);
 
   useEffect(() => {
@@ -865,14 +914,15 @@ const Orders = ({ toast }) => {
         <ErrMsg msg={err} />
         <SearchSelect
   label="Shop" placeholder="Search shop…"
-  options={(Array.isArray(shops) ? shops : []).map(s => ({ value: s.id, label: s.shop_name }))}
-  value={shopId} onChange={val => sSi(String(val))}
-  onAddNew={() => { sM(false); /* navigate to shops or open add shop modal */ toast("🏪", "Go to Shops page to add a new shop") }}
-  addNewLabel="Add new shop"
+  options={(Array.isArray(shops)?shops:[]).map(s=>({value:s.id,label:s.shop_name}))}
+  value={shopId} onChange={val=>sSi(String(val))}
+  onAddNew={()=>{ sASF({shop_name:"",phone:"",address:""}); sASE(""); sASM(true); }}
+  addNewLabel="+ Add new shop"
 />
-        <ProductRows
+
+<ProductRows
   rows={rows} setRows={sR} products={prods}
-  onAddProduct={() => { sM(false); toast("📦", "Go to Products page to add a new product") }}
+  onAddProduct={(rowIndex)=>{ sAPRI(rowIndex); sAPF({name:"",price:"",mrp:"",qty:""}); sAPE(""); sAPM(true); }}
 />
         <div style={{ marginTop: 14, background: "rgba(108,99,255,.06)", border: "1px solid rgba(108,99,255,.2)", borderRadius: 7, padding: "10px 12px", fontSize: 11, color: "var(--muted)" }}>
           📨 Telegram notification sent automatically
@@ -898,6 +948,25 @@ const Orders = ({ toast }) => {
           💡 Set quantity to 0 to remove a product from the order
         </div>
       </Modal>
+      {/* ── Add Shop Modal (from Orders) ── */}
+<Modal open={addShopModal} onClose={()=>sASM(false)} title="Add New Shop"
+  footer={<><Btn onClick={()=>sASM(false)}>Cancel</Btn><Btn primary onClick={addShopAndSelect} disabled={addShopSaving}>{addShopSaving?"Saving…":"Add Shop"}</Btn></>}
+>
+  <ErrMsg msg={addShopErr}/>
+  <Field label="Shop Name" placeholder="e.g. Cafe Javas" value={addShopForm.shop_name} onChange={e=>sASF({...addShopForm,shop_name:e.target.value})}/>
+  <Field label="Phone"     placeholder="9876543210"       value={addShopForm.phone}     onChange={e=>sASF({...addShopForm,phone:e.target.value})}/>
+  <Field label="Address"   placeholder="Street, City"     value={addShopForm.address}   onChange={e=>sASF({...addShopForm,address:e.target.value})}/>
+</Modal>
+
+{/* ── Add Product Modal (from Orders) ── */}
+<Modal open={addProdModal} onClose={()=>sAPM(false)} title="Add New Product"
+  footer={<><Btn onClick={()=>sAPM(false)}>Cancel</Btn><Btn primary onClick={addProdAndSelect} disabled={addProdSaving}>{addProdSaving?"Saving…":"Add Product"}</Btn></>}
+>
+  <ErrMsg msg={addProdErr}/>
+  <Field label="Name"  placeholder="Product name"  value={addProdForm.name}  onChange={e=>sAPF({...addProdForm,name:e.target.value})}/>
+  <Field label="Price" placeholder="0.00" type="number" value={addProdForm.price} onChange={e=>sAPF({...addProdForm,price:e.target.value})}/>
+  <Field label="MRP"   placeholder="0.00" type="number" value={addProdForm.mrp}   onChange={e=>sAPF({...addProdForm,mrp:e.target.value})}/>
+</Modal>
     </div>
   );
 };
