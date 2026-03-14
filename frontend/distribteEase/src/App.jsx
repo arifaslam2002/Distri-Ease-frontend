@@ -461,7 +461,7 @@ const Dashboard = ()=>{
             <div className="tbl-wrap">
               <table className="tbl">
                 <thead><tr>
-                  <th className="th">Order</th><th className="th">Shop</th>
+                  <th className="th">Shop</th>
                   <th className="th">Total</th><th className="th">Date</th>
                 </tr></thead>
                 <tbody>
