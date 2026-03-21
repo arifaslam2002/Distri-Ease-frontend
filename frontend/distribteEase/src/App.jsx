@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback,useRef } from "react";
 import axios from "axios";
+import { Analytics } from "@vercel/analytics/next"
 
 // ── API ────────────────────────────────────────────────────────────────────
 const api = axios.create({
@@ -1762,6 +1763,7 @@ export default function App(){
       </div>
 
       <Toast toasts={toasts}/>
+      <Analytics />
     </>
   );
 }
