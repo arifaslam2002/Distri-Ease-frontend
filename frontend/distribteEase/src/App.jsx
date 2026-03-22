@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback,useRef } from "react";
 import axios from "axios";
-import { Analytics } from "@vercel/analytics/next"
+import { Analytics } from "@vercel/analytics/react";
 
 // ── API ────────────────────────────────────────────────────────────────────
 const api = axios.create({
