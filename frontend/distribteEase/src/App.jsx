@@ -35,7 +35,7 @@ const CSS = `
   --a3:      #ff4d6d;
   --warn:    #f0a500;
   --text:    #eeeef8;
-  --muted:   #5a5a78;
+  --muted: #9e9eed;
   --font:    'JetBrains Mono', monospace;
   --display: 'Syne', sans-serif;
   --sidebar: 252px;
