@@ -758,9 +758,9 @@ const Orders = ({ toast }) => {
   const [addProdSaving, sAPv]= useState(false);
   const [addProdErr, sAPE]   = useState("");
 
-  // ✅ track which modal triggered add product
-  const [addProdTarget, sAPT]   = useState("place");
-  const [addProdRowIndex, sAPRI] = useState(0);
+  // ✅ useRef instead of useState — no stale closure issue
+  const addProdTarget   = useRef("place");
+  const addProdRowIndex = useRef(0);
 
   const load_ = useCallback(() => {
     sL(true);
@@ -796,11 +796,12 @@ const Orders = ({ toast }) => {
       toast("🏪","Shop added!");
       sASM(false);
       sASF({shop_name:"",phone:"",address:""});
+      // ✅ reopen place order modal after adding shop
+      setTimeout(() => sM(true), 100);
     } catch(e){ sASE(e.response?.data?.detail||"Failed"); }
     finally{ sASv(false); }
   };
 
-  // ✅ fixed — saves to correct rows based on target
   const addProdAndSelect = async () => {
     sAPE(""); sAPv(true);
     try {
@@ -813,19 +814,23 @@ const Orders = ({ toast }) => {
       const d = res.data || [];
       sPr(d);
 
-      // ✅ select in correct modal
-      if (addProdTarget === "edit") {
-        const n = [...editRows];
-        if (!n[addProdRowIndex]) n[addProdRowIndex] = { product_id: "", quantity: 1 };
-        n[addProdRowIndex].product_id = String(r.data.id);
-        sER(n);
-        sEM(true);   // ✅ reopen edit modal
+      // ✅ use ref value — never stale
+      if (addProdTarget.current === "edit") {
+        sER(prev => {
+          const n = [...prev];
+          if (!n[addProdRowIndex.current]) n[addProdRowIndex.current] = { product_id: "", quantity: 1 };
+          n[addProdRowIndex.current].product_id = String(r.data.id);
+          return n;
+        });
+        setTimeout(() => sEM(true), 100);
       } else {
-        const n = [...rows];
-        if (!n[addProdRowIndex]) n[addProdRowIndex] = { product_id: "", quantity: 1 };
-        n[addProdRowIndex].product_id = String(r.data.id);
-        sR(n);
-        sM(true);    // ✅ reopen place modal
+        sR(prev => {
+          const n = [...prev];
+          if (!n[addProdRowIndex.current]) n[addProdRowIndex.current] = { product_id: "", quantity: 1 };
+          n[addProdRowIndex.current].product_id = String(r.data.id);
+          return n;
+        });
+        setTimeout(() => sM(true), 100);
       }
 
       toast("📦","Product added!");
@@ -843,11 +848,8 @@ const Orders = ({ toast }) => {
       const raw = r.data;
       const d = Array.isArray(raw) ? raw : raw?.orders || [];
       sSOrd(d);
-    } catch {
-      sSOrd([]);
-    } finally {
-      sSL(false);
-    }
+    } catch { sSOrd([]); }
+    finally { sSL(false); }
   };
 
   const place = async () => {
@@ -991,19 +993,18 @@ const Orders = ({ toast }) => {
           label="Shop" placeholder="Search shop…"
           options={(Array.isArray(shops)?shops:[]).map(s=>({value:s.id,label:s.shop_name}))}
           value={shopId} onChange={val=>sSi(String(val))}
-          onAddNew={()=>{ sASF({shop_name:"",phone:"",address:""}); sASE(""); sASM(true); }}
+          onAddNew={()=>{ sASF({shop_name:"",phone:"",address:""}); sASE(""); sM(false); setTimeout(()=>sASM(true),100); }}
           addNewLabel="+ Add new shop"
         />
-        {/* ✅ rows — not editRows */}
         <ProductRows
           rows={rows} setRows={sR} products={prods}
           onAddProduct={(rowIndex) => {
-            sAPT("place");       // ✅ target = place
-            sAPRI(rowIndex);
+            addProdTarget.current   = "place";
+            addProdRowIndex.current = rowIndex;
             sAPF({name:"", price:"", mrp:""});
             sAPE("");
-            sM(false);           // close place modal
-            sAPM(true);          // open add product modal
+            sM(false);
+            setTimeout(() => sAPM(true), 100);
           }}
         />
         <div style={{ marginTop: 14, background: "rgba(108,99,255,.06)", border: "1px solid rgba(108,99,255,.2)", borderRadius: 7, padding: "10px 12px", fontSize: 11, color: "var(--muted)" }}>
@@ -1025,16 +1026,15 @@ const Orders = ({ toast }) => {
             <span>Total: <span style={{ color: "var(--accent)" }}>₹{editOrder.Grand_total || editOrder.grand_total}</span></span>
           </div>
         )}
-        {/* ✅ editRows + target = edit */}
         <ProductRows
           rows={editRows} setRows={sER} products={prods}
           onAddProduct={(rowIndex) => {
-            sAPT("edit");        // ✅ target = edit
-            sAPRI(rowIndex);
+            addProdTarget.current   = "edit";
+            addProdRowIndex.current = rowIndex;
             sAPF({name:"", price:"", mrp:""});
             sAPE("");
-            sEM(false);          // close edit modal
-            sAPM(true);          // open add product modal
+            sEM(false);
+            setTimeout(() => sAPM(true), 100);
           }}
         />
         <div style={{ marginTop: 10, fontSize: 10, color: "var(--muted)" }}>
@@ -1043,8 +1043,11 @@ const Orders = ({ toast }) => {
       </Modal>
 
       {/* ── Add Shop Modal ── */}
-      <Modal open={addShopModal} onClose={()=>sASM(false)} title="Add New Shop"
-        footer={<><Btn onClick={()=>sASM(false)}>Cancel</Btn><Btn primary onClick={addShopAndSelect} disabled={addShopSaving}>{addShopSaving?"Saving…":"Add Shop"}</Btn></>}
+      <Modal open={addShopModal} onClose={()=>{ sASM(false); setTimeout(()=>sM(true),100); }} title="Add New Shop"
+        footer={
+          <><Btn onClick={()=>{ sASM(false); setTimeout(()=>sM(true),100); }}>Cancel</Btn>
+          <Btn primary onClick={addShopAndSelect} disabled={addShopSaving}>{addShopSaving?"Saving…":"Add Shop"}</Btn></>
+        }
       >
         <ErrMsg msg={addShopErr}/>
         <Field label="Shop Name" placeholder="e.g. Cafe Javas" value={addShopForm.shop_name} onChange={e=>sASF({...addShopForm,shop_name:e.target.value})}/>
@@ -1053,8 +1056,14 @@ const Orders = ({ toast }) => {
       </Modal>
 
       {/* ── Add Product Modal ── */}
-      <Modal open={addProdModal} onClose={()=>{ sAPM(false); addProdTarget==="edit"?sEM(true):sM(true); }} title="Add New Product"
-        footer={<><Btn onClick={()=>{ sAPM(false); addProdTarget==="edit"?sEM(true):sM(true); }}>Cancel</Btn><Btn primary onClick={addProdAndSelect} disabled={addProdSaving}>{addProdSaving?"Saving…":"Add Product"}</Btn></>}
+      <Modal
+        open={addProdModal}
+        onClose={()=>{ sAPM(false); setTimeout(()=> addProdTarget.current==="edit"?sEM(true):sM(true), 100); }}
+        title="Add New Product"
+        footer={
+          <><Btn onClick={()=>{ sAPM(false); setTimeout(()=> addProdTarget.current==="edit"?sEM(true):sM(true), 100); }}>Cancel</Btn>
+          <Btn primary onClick={addProdAndSelect} disabled={addProdSaving}>{addProdSaving?"Saving…":"Add Product"}</Btn></>
+        }
       >
         <ErrMsg msg={addProdErr}/>
         <Field label="Name"  placeholder="Product name"  value={addProdForm.name}  onChange={e=>sAPF({...addProdForm,name:e.target.value})}/>
