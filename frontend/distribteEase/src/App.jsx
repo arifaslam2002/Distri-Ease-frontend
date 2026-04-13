@@ -707,7 +707,7 @@ const ProductRows = ({ rows, setRows, products, onAddProduct }) => {
                   value={r.product_id}
                   onChange={val=>{ const n=[...rows]; n[i].product_id=val; setRows(n); }}
                   onAddNew={()=>onAddProduct&&onAddProduct(i)}
-                  addNewLabel="+ Add new product"
+                  addNewLabel="Add new product"
                 />
               </div>
               <div style={{marginBottom:14}}>
@@ -1016,7 +1016,7 @@ const Orders = ({ toast }) => {
           options={(Array.isArray(shops)?shops:[]).map(s=>({value:s.id,label:s.shop_name}))}
           value={shopId} onChange={val=>sSi(String(val))}
           onAddNew={()=>{ sASF({shop_name:"",phone:"",address:""}); sASE(""); sM(false); setTimeout(()=>sASM(true),100); }}
-          addNewLabel="+ Add new shop"
+          addNewLabel="Add new shop"
         />
         <ProductRows
           rows={rows} setRows={sR} products={prods}
