@@ -357,6 +357,28 @@ const ConfirmModal = ({open, onConfirm, onCancel, title="Are you sure?", message
     </div>
   );
 };
+const useConfirm = () => {
+  const [cfg, sCfg] = useState(null);
+
+  const confirm = (title, message, confirmLabel="Confirm", danger=true) =>
+    new Promise(resolve => {
+      sCfg({ title, message, confirmLabel, danger, resolve });
+    });
+
+  const modal = cfg ? (
+    <ConfirmModal
+      open={true}
+      title={cfg.title}
+      message={cfg.message}
+      confirmLabel={cfg.confirmLabel}
+      danger={cfg.danger}
+      onConfirm={() => { sCfg(null); cfg.resolve(true); }}
+      onCancel={()  => { sCfg(null); cfg.resolve(false); }}
+    />
+  ) : null;
+
+  return { confirm, modal };
+};
 // ── LOGIN ──────────────────────────────────────────────────────────────────
 const Login = ({onLogin})=>{
   const [email,sE]=useState(""); const [pass,sP]=useState("");
