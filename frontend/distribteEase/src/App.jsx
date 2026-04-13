@@ -783,7 +783,7 @@ const Orders = ({ toast }) => {
   // ✅ useRef instead of useState — no stale closure issue
   const addProdTarget   = useRef("place");
   const addProdRowIndex = useRef(0);
-
+  const user = JSON.parse(localStorage.getItem("de_user") || "{}");
   const load_ = useCallback(() => {
     sL(true);
     api.get("/orders/orders").then(r => {
@@ -935,6 +935,7 @@ const Orders = ({ toast }) => {
             <table className="tbl" style={{ minWidth: 500 }}>
               <thead><tr>
                 <th className="th">Shop</th>
+                <th className="th">By</th>
                 <th className="th">Total</th>
                 <th className="th hide-sm">Date</th>
                 <th className="th">Actions</th>
@@ -950,6 +951,12 @@ const Orders = ({ toast }) => {
                         {o.shop_name || `Shop #${o.shop_id}`}
                       </span>
                     </td>
+                    <td className="td">
+                    {user.role === "admin"
+          ? <span style={{fontSize:11,color:"var(--muted)"}}>{o.salesman_name}</span>
+          : <span style={{fontSize:11,color:"var(--muted)"}}>—</span>
+        }
+      </td>
                     <td className="td" style={{ color: "var(--accent)" }}>₹{o.Grand_total}</td>
                     <td className="td hide-sm" style={{ color: "var(--muted)" }}>{o.order_date?.split("T")[0] || "—"}</td>
                     <td className="td">
